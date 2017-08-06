@@ -1282,7 +1282,6 @@ class assembler:
 				else:
 					print('\n\tout of place token on line {}'.format(self.lcount))
 					raise Exception()
-		print(self.labels)
 
 def azm(IN, OUT):
 	assembler(IN, OUT)
