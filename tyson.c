@@ -2394,7 +2394,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		bp1 = img_byte(*up1);
 		ip += wordsize;
-		printf("\n\t\theap_mem(u8): %u", (unsigned) *bp1);
+		printf("\n\t\theap[%u] = (u8) %u", (unsigned) *up1, (unsigned) *bp1);
 		exec_next();
 	show_mem_u:
 		#ifdef DEBUG_MODE
@@ -2403,9 +2403,9 @@ execute_process(Process* pro)
 		#endif
 		++ip;
 		up1 = (u64*) ip;
-		up1 = (u64*) img_byte(*up1);
+		up2 = (u64*) img_byte(*up1);
 		ip += wordsize;
-		printf("\n\t\theap_mem(u64): %u", (unsigned) *up1);
+		printf("\n\t\theap[%u] = (u64) %u", (unsigned) *up1, (unsigned) *up2);
 		exec_next();
 	show_mem_i:
 		#ifdef DEBUG_MODE
@@ -2416,7 +2416,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		ip1 = (s64*) img_byte(*up1);
 		ip += wordsize;
-		printf("\n\t\theap_mem(s64): %d", (int) *ip1);
+		printf("\n\t\theap[%u] = (s64) %u", (unsigned) *up1, (int) *ip2);
 		exec_next();
 	show_mem_r:
 		#ifdef DEBUG_MODE
@@ -2427,7 +2427,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		rp1 = (r64*) img_byte(*up1);
 		ip += wordsize;
-		printf("\n\t\theap_mem(r64): %f", (double) *rp1);
+		printf("\n\t\theap[%u] = (r64) %f", (unsigned) *up1, (double) *rp1);
 		exec_next();
 	show_mem_s:
 		#ifdef DEBUG_MODE
@@ -2437,7 +2437,8 @@ execute_process(Process* pro)
 		++ip;
 		up1 = (u64*) ip;
 		bp1 = (char*) img_byte(*up1);
-		printf("\n\t\theap_mem(str): \"%s\"", (char*) bp1);
+		printf("\n\t\theap[%u] = (str) \"%s\"", (unsigned) *up1, (char*) bp1);
+		ip += wordsize;
 		exec_next();
 
 	stk_tt_dup:
@@ -2540,5 +2541,4 @@ int main() {
 	ty_exec(pro);
 	return 0;
 }
-
 
