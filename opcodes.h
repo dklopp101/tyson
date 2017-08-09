@@ -3,7 +3,7 @@
 
 #include "tyson.h"
 
-#define OPCOUNT      209
+#define OPCOUNT      213
 
 #define DIE            0
 #define NOP            1
@@ -203,7 +203,7 @@
 #define STK_XCHT     183
 #define STK_GCOL     184
 
-#define RSV_SYS1     185
+#define OPENF        185
 #define RSV_SYS2     186
 #define RSV_SYS3     187
 #define RSV_SYS4     188
@@ -228,6 +228,12 @@
 #define SHOW_MEM_I   206
 #define SHOW_MEM_R   207
 #define SHOW_MEM_S   208
+
+#define tdx_b_up     209
+#define tdx_b_dwn    210
+#define tdx_w_up     211
+#define tdx_w_dwn    212
+
 
 #define build_optable()                  			  \
 	static void* optable[OPCOUNT]= {&&die,            \
@@ -415,7 +421,7 @@
 									&&stk_pop, \
 									&&stk_xcht, \
 									&&stk_gcol, \
-									&&rsv_sys1, \
+									&&openf, \
 									&&rsv_sys2, \
 									&&rsv_sys3, \
 									&&rsv_sys4, \
@@ -438,7 +444,13 @@
 									&&show_mem_u, \
 									&&show_mem_i, \
 									&&show_mem_r, \
-                                    &&show_mem_s}
+                                    &&show_mem_s, \
+                                    &&tdx_b_up,   \
+                                    &&tdx_b_dwn,  \
+                                    &&tdx_w_up,   \
+                                    &&tdx_w_dwn}
+
+}
 
 char* opcode_strmap[OPCOUNT];
 

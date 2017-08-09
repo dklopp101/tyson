@@ -1,6 +1,27 @@
 import struct
 import ctypes
 
+READ_MODE          = "r"
+WRITE_MODE         = "w"
+APPEND_MODE        = "a"
+READ_UPDATE_MODE   = "r+"
+WRITE_UPDATE_MODE  = "w+"
+APPEND_UPDATE_MODE = "a+"
+
+fopen_codemap = { READ_MODE          : 1,
+                  WRITE_MODE         : 2,
+                  APPEND_MODE        : 3,
+                  READ_UPDATE_MODE   : 4,
+                  WRITE_UPDATE_MODE  : 5,
+                  APPEND_UPDATE_MODE : 6 }
+
+fopen_codes = ( READ_MODE,
+                WRITE_MODE,
+                APPEND_MODE,
+                READ_UPDATE_MODE,
+                WRITE_UPDATE_MODE,
+                APPEND_UPDATE_MODE )
+
 U8  = 11
 U64 = 12
 S64 = 13
@@ -229,7 +250,7 @@ STK_STOR     = 181
 STK_POP      = 182
 STK_XCHT     = 183
 STK_GCOL     = 184
-RSV_SYS1     = 185
+OPENF        = 185
 RSV_SYS2     = 186
 RSV_SYS3     = 187
 RSV_SYS4     = 188
@@ -253,6 +274,11 @@ SHOW_MEM_U   = 205
 SHOW_MEM_I   = 206
 SHOW_MEM_R   = 207
 SHOW_MEM_S   = 208
+TDX_B_UP     = 209
+TDX_B_DWN    = 210
+TDX_w_UP     = 211
+TDX_w_DWN    = 212
+
 
 TEXT_BASE    = 73
 
@@ -351,6 +377,7 @@ opmap = {'die' : DIE,
          'cpy_nw' : CPY_NW,
          'cpy_dw' : CPY_DW,
          'cpy_qw' : CPY_QW,
+		 'cpy_s'  : CPY_S,
          'xch_b' : XCH_B,
          'xch_nb' : XCH_NB,
          'xch_hw' : XCH_HW,
@@ -358,6 +385,7 @@ opmap = {'die' : DIE,
          'xch_nw' : XCH_NW,
          'xch_dw' : XCH_DW,
          'xch_qw' : XCH_QW,
+		 'xch_s'  : XCH_S,
          'str_cmp' : STR_CMP,
          'str_ncmp' : STR_NCMP,
          'jmp_str_cmp' : JMP_STR_CMP,
@@ -439,7 +467,7 @@ opmap = {'die' : DIE,
          'stk_pop' : STK_POP,
          'stk_xcht' : STK_XCHT,
          'stk_gcol' : STK_GCOL,
-         'rsv_sys1' : RSV_SYS1,
+         'openf' : OPENF,
          'rsv_sys2' : RSV_SYS2,
          'rsv_sys3' : RSV_SYS3,
          'rsv_sys4' : RSV_SYS4,
@@ -462,7 +490,11 @@ opmap = {'die' : DIE,
          'show_mem_u' : SHOW_MEM_U,
          'show_mem_i' : SHOW_MEM_I,
          'show_mem_r' : SHOW_MEM_R,
-         'show_mem_s' : SHOW_MEM_S}
+         'show_mem_s' : SHOW_MEM_S,
+         'tdx_b_up' : TDX_B_UP,
+         'tdx_b_dwn' : TDX_B_DWN,
+         'tdx_w_up' : TDX_W_UP,
+         'tdx_w_dwn' : TDX_W_DWN}
 
 no_arg_ops = ( DIE,
                NOP,
@@ -547,7 +579,11 @@ no_arg_ops = ( DIE,
                SHOW_TOP_B,
                SHOW_TOP_U,
                SHOW_TOP_I,
-               SHOW_TOP_R ) 
+               SHOW_TOP_R,
+               TDX_B_UP,
+               TDX_B_DWN,
+               TDX_w_UP,
+               TDX_w_DWN )
  
 def from_opname(opname):
 	return opmap[opname]

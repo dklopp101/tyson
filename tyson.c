@@ -1628,6 +1628,38 @@ execute_process(Process* pro)
 		up1 = (u64*) sp;
 		tdx = img_byte(*up1);
 		exec_next();
+	tdx_b_up:
+		#ifdef DEBUG_MODE
+		++cycnum;
+		printf("\n\tTDX_B_UP executed on cycle %u", (unsigned) cycnum);
+		#endif
+		++tdx;
+		++ip;
+		exec_next();	
+	tdx_b_dwn:
+		#ifdef DEBUG_MODE
+		++cycnum;
+		printf("\n\tTDX_B_DWN executed on cycle %u", (unsigned) cycnum);
+		#endif
+		--tdx;
+		++ip;
+		exec_next();	
+	tdx_w_up:
+		#ifdef DEBUG_MODE
+		++cycnum;
+		printf("\n\tTDX_W_UP executed on cycle %u", (unsigned) cycnum);
+		#endif
+		tdx += wordsize;
+		++ip;
+		exec_next();
+	tdx_w_dwn:
+		#ifdef DEBUG_MODE
+		++cycnum;
+		printf("\n\tTDX_W_DWN executed on cycle %u", (unsigned) cycnum);
+		#endif
+		tdx -= wordsize;
+		++ip;
+		exec_next();
 	t_fd_putb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2541,4 +2573,5 @@ int main() {
 	ty_exec(pro);
 	return 0;
 }
+
 
