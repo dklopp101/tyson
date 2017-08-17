@@ -276,8 +276,8 @@ SHOW_MEM_R   = 207
 SHOW_MEM_S   = 208
 TDX_B_UP     = 209
 TDX_B_DWN    = 210
-TDX_w_UP     = 211
-TDX_w_DWN    = 212
+TDX_W_UP     = 211
+TDX_W_DWN    = 212
 
 
 TEXT_BASE    = 73
@@ -496,7 +496,8 @@ opmap = {'die' : DIE,
          'tdx_w_up' : TDX_W_UP,
          'tdx_w_dwn' : TDX_W_DWN}
 
-no_arg_ops = ( DIE,
+no_arg_ops = ( BREAKPOINT,
+               DIE,
                NOP,
                RET,
                JMP_C1,
@@ -582,8 +583,8 @@ no_arg_ops = ( DIE,
                SHOW_TOP_R,
                TDX_B_UP,
                TDX_B_DWN,
-               TDX_w_UP,
-               TDX_w_DWN )
+               TDX_W_UP,
+               TDX_W_DWN )
  
 def from_opname(opname):
 	return opmap[opname]

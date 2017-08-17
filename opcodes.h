@@ -229,10 +229,10 @@
 #define SHOW_MEM_R   207
 #define SHOW_MEM_S   208
 
-#define tdx_b_up     209
-#define tdx_b_dwn    210
-#define tdx_w_up     211
-#define tdx_w_dwn    212
+#define TDX_B_UP     209
+#define TDX_B_DWN    210
+#define TDX_W_UP     211
+#define TDX_W_DWN    212
 
 
 #define build_optable()                  			  \
@@ -450,7 +450,7 @@
                                     &&tdx_w_up,   \
                                     &&tdx_w_dwn}
 
-}
+
 
 char* opcode_strmap[OPCOUNT];
 
@@ -460,3 +460,4 @@ u8  is_mneumonic(const char*);
 u8  is_opcode(const u64);
 
 #endif
+

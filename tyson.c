@@ -6,12 +6,9 @@
 
 #include "tyson.h"
 #include "opcodes.h"
+#include "debug.h"
 
-// VM compilation mode is specified by the macro below.
-// Set to DEBUG_MODE or REAL_MODE.
-#define DEBUG_MODE
-
-#define exec_next() \
+#define next_op() \
 	goto *optable[*ip]
 
 #define stack_byte(offset) \
@@ -22,6 +19,31 @@
 
 #define sp_offset() \
 	((u64) (sp - stk))
+
+// VM compilation mode is specified by the macro below.
+// Set to DEBUG_MODE or REAL_MODE.
+#define DEBUG_MODE
+
+#ifdef DEBUG_MODE
+	#define next_cycle()           \
+    {	if (db_mode==STEP) {       \
+            switch (cycact) {      \
+                case 1:            \
+                    cycact = 2;    \
+                    next_op();     \
+                case 2:            \
+                    cycact = 1;    \
+                    goto db_start; \
+            }                      \
+		} else {                   \
+			next_op();             \
+		}                          \
+    }
+#else
+	#define next_cycle() \
+		next_op()
+#endif
+
 
 void
 execute_process(Process* pro)
@@ -66,30 +88,35 @@ execute_process(Process* pro)
 
 	#ifdef DEBUG_MODE
 	// Set up debug-mode variables.
-	u64 cycnum = 0;
-	clock_t toc;
-	clock_t tic = clock();
-	#endif
-
+	build_dbtable();
+    u8  db_mode = STEP;
+	u64 cycnum  = 0;
+    u8  cycact  = 1;
+    goto db_start;
+	#else
 	// VM has been initialised and is ready to call the process' main subroutine.
-	exec_next();
+	next_cycle();
+    #endif
 
   	// Instruction Blocks.
 	die:
 		#ifdef DEBUG_MODE
-		toc = clock();
 		++cycnum;
-		printf("\n\tDIE executed on cycle %u\n", (unsigned) cycnum);
-		printf("\n\t   runtime: %f secs", (double) (toc - tic) / CLOCKS_PER_SEC);
-		#endif
+		if (*ip == DIE)
+		    printf("\n\tDIE executed on cycle %u\n", (unsigned) cycnum);
+		ip = pro->start_byte;
+		cycnum = 1;
+		goto db_start;
+		#else
 		return;
+		#endif
 	nop:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\n\tNOP executed on cycle %u", (unsigned) cycnum);
 		#endif
 		++ip; // point ip at next opcode in sequence.
-		exec_next();
+		next_cycle();
 	jmp:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -98,7 +125,7 @@ execute_process(Process* pro)
 		++ip; // point ip at first arg, jump-target address.
 		up1 = (u64*) ip; // get u64 pointer to said arg.
 		ip = img_byte(*up1); // set ip at jump-target.
-		exec_next();
+		next_cycle();
 	call:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -109,7 +136,7 @@ execute_process(Process* pro)
 		*rp = ip + wordsize; // set rp to the first byte after this instr, the ret address.
 		up1 = (u64*) ip; // get u64 pointer to jump-target.
 		ip = img_byte(*up1); // set ip to jump-target.
-		exec_next();
+		next_cycle();
 	ret:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -117,7 +144,7 @@ execute_process(Process* pro)
 		#endif
 		ip = *rp; // set ip to current return address, top of ret-stack.
 		--rp; // dec rp so top of ret-stack is the correct ret adress.
-		exec_next();
+		next_cycle();
 	swch:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -128,7 +155,7 @@ execute_process(Process* pro)
 		sp -= wordsize; // swch auto-pops jump-tbl index value off top.
 		up2 = (u64*) (ip + (*up1)); // index jump-tbl with index value to yield target address.
 		ip = img_byte(*up2); // set ip to target address then execute next.
-		exec_next();
+		next_cycle();
 	jeq_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -143,7 +170,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jneq_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -158,7 +185,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jeq_w:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -173,7 +200,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jneq_w:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -188,7 +215,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jgeq_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -203,7 +230,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jleq_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -218,7 +245,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jgt_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -233,7 +260,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jlt_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -248,7 +275,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jgeq_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -263,7 +290,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jleq_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -278,7 +305,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jgt_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -293,7 +320,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jlt_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -308,7 +335,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jgeq_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -323,7 +350,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jleq_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -338,7 +365,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jgt_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -353,7 +380,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jlt_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -368,7 +395,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jgeq_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -383,7 +410,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jleq_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -398,7 +425,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jgt_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -413,7 +440,7 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jlt_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -428,35 +455,35 @@ execute_process(Process* pro)
 		} else {
 			ip += 8;
 		}
-		exec_next();
+		next_cycle();
 	jmp_c1:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\n\tJMP_C1 executed on cycle %u", (unsigned) cycnum);
 		#endif
 		ip = c1;
-		exec_next();
+		next_cycle();
 	jmp_c2:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\n\tJMP_C2 executed on cycle %u", (unsigned) cycnum);
 		#endif
 		ip = c2;
-		exec_next();
+		next_cycle();
 	jmp_c3:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\n\tJMP_C3 executed on cycle %u", (unsigned) cycnum);
 		#endif
 		ip = c3;
-		exec_next();
+		next_cycle();
 	jmp_c4:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\n\tJMP_C4 executed on cycle %u", (unsigned) cycnum);
 		#endif
 		ip = c3;
-		exec_next();
+		next_cycle();
 	set_c1:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -466,7 +493,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		c1 = img_byte(*up1);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	set_c2:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -476,7 +503,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		c2 = img_byte(*up1);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	set_c3:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -486,7 +513,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		c3 = img_byte(*up1);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	set_c4:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -496,7 +523,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		c4 = img_byte(*up1);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	eq:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -511,7 +538,7 @@ execute_process(Process* pro)
 			*up1 = TRUE;
 		else
 			*up1 = FALSE;
-		exec_next();
+		next_cycle();
 	neq:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -526,7 +553,7 @@ execute_process(Process* pro)
 			*up1 = TRUE;
 		else
 			*up1 = FALSE;
-		exec_next();
+		next_cycle();
 	and:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -538,7 +565,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		wp3 = (w64*) sp;
 		*wp3 = ((*wp1) & (*wp2));
-		exec_next();
+		next_cycle();
 	not:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -549,7 +576,7 @@ execute_process(Process* pro)
 		sp -= wordsize;
 		wp2 = (u64*) sp;
 		*wp2 = !(*wp1);
-		exec_next();
+		next_cycle();
 	or:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -561,7 +588,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		wp3 = (w64*) sp;
 		*wp3 = ((*wp1) | (*wp2));
-		exec_next();
+		next_cycle();
 	xor:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -573,7 +600,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		wp3 = (w64*) sp;
 		*wp3 = ((*wp1) ^ (*wp2));
-		exec_next();
+		next_cycle();
 	lsh:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -585,7 +612,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		wp3 = (w64*) sp;
 		*wp3 = ((*wp1) << (*wp2));
-		exec_next();
+		next_cycle();
 	rsh:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -597,7 +624,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		wp3 = (w64*) sp;
 		*wp3 = ((*wp1) >> (*wp2));
-		exec_next();
+		next_cycle();
 	inc_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -605,7 +632,7 @@ execute_process(Process* pro)
 		#endif
 		++ip;
 		++(*sp);
-		exec_next();
+		next_cycle();
 	inc_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -614,7 +641,7 @@ execute_process(Process* pro)
 		++ip;
 		up1 = (u64*) sp;
 		++(*up1);
-		exec_next();
+		next_cycle();
 	inc_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -623,7 +650,7 @@ execute_process(Process* pro)
 		++ip;
 		ip1 = (s64*) sp;
 		++(*ip1);
-		exec_next();
+		next_cycle();
 	dec_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -631,7 +658,7 @@ execute_process(Process* pro)
 		#endif
 		++ip;
 		--(*sp);
-		exec_next();
+		next_cycle();
 	dec_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -640,7 +667,7 @@ execute_process(Process* pro)
 		++ip;
 		up1 = (u64*) sp;
 		--(*up1);
-		exec_next();
+		next_cycle();
 	dec_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -649,7 +676,7 @@ execute_process(Process* pro)
 		++ip;
 		ip1 = (s64*) sp;
 		--(*ip1);
-		exec_next();
+		next_cycle();
 	add_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -660,7 +687,7 @@ execute_process(Process* pro)
 		bp2 = (sp - wordsize);
 		sp -= dwordsize;
 		*sp = ((*bp1) + (*bp2));
-		exec_next();
+		next_cycle();
 	add_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -672,7 +699,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		up3 = (w64*) sp;
 		*up3 = ((*up1) + (*up2));
-		exec_next();
+		next_cycle();
 	add_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -684,7 +711,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		ip3 = (s64*) sp;
 		*ip3 = ((*ip1) + (*ip2));
-		exec_next();
+		next_cycle();
 	add_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -696,7 +723,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		rp3 = (r64*) sp;
 		*rp3 = ((*rp1) + (*rp2));
-		exec_next();
+		next_cycle();
 	sub_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -707,7 +734,7 @@ execute_process(Process* pro)
 		bp2 = (sp - wordsize);
 		sp -= dwordsize;
 		*sp = ((*bp1) - (*bp2));
-		exec_next();
+		next_cycle();
 	sub_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -719,7 +746,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		up3 = (w64*) sp;
 		*up3 = ((*up1) - (*up2));
-		exec_next();
+		next_cycle();
 	sub_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -731,7 +758,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		ip3 = (s64*) sp;
 		*ip3 = ((*ip1) - (*ip2));
-		exec_next();
+		next_cycle();
 	sub_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -743,7 +770,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		rp3 = (r64*) sp;
 		*rp3 = ((*rp1) - (*rp2));
-		exec_next();
+		next_cycle();
 	mul_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -754,7 +781,7 @@ execute_process(Process* pro)
 		bp2 = (sp - wordsize);
 		sp -= dwordsize;
 		*sp = ((*bp1) * (*bp2));
-		exec_next();
+		next_cycle();
 	mul_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -766,7 +793,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		up3 = (w64*) sp;
 		*up3 = ((*up1) * (*up2));
-		exec_next();
+		next_cycle();
 	mul_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -778,7 +805,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		ip3 = (s64*) sp;
 		*ip3 = ((*ip1) * (*ip2));
-		exec_next();
+		next_cycle();
 	mul_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -790,7 +817,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		rp3 = (r64*) sp;
 		*rp3 = ((*rp1) * (*rp2));
-		exec_next();
+		next_cycle();
 	div_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -801,7 +828,7 @@ execute_process(Process* pro)
 		bp2 = (sp - wordsize);
 		sp -= dwordsize;
 		*sp = ((*bp1) / (*bp2));
-		exec_next();
+		next_cycle();
 	div_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -813,7 +840,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		up3 = (w64*) sp;
 		*up3 = ((*up1) / (*up2));
-		exec_next();
+		next_cycle();
 	div_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -825,7 +852,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		ip3 = (s64*) sp;
 		*ip3 = ((*ip1) / (*ip2));
-		exec_next();
+		next_cycle();
 	div_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -837,7 +864,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		rp3 = (r64*) sp;
 		*rp3 = ((*rp1) / (*rp2));
-		exec_next();
+		next_cycle();
 	mod_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -848,7 +875,7 @@ execute_process(Process* pro)
 		bp2 = (sp - wordsize);
 		sp -= dwordsize;
 		*sp = ((*bp1) % (*bp2));
-		exec_next();
+		next_cycle();
 	mod_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -860,7 +887,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		up3 = (w64*) sp;
 		*up3 = ((*up1) % (*up2));
-		exec_next();
+		next_cycle();
 	mod_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -872,7 +899,7 @@ execute_process(Process* pro)
 		sp -= dwordsize;
 		ip3 = (s64*) sp;
 		*ip3 = ((*ip1) % (*ip2));
-		exec_next();
+		next_cycle();
 	b2u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -883,7 +910,7 @@ execute_process(Process* pro)
 		*up1 = (u64) (*sp);
 		up2 = (u64*) sp;
 		*up2 = *up1;
-		exec_next();
+		next_cycle();
 	b2i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -894,7 +921,7 @@ execute_process(Process* pro)
 		*ip1 = (s64) (*sp);
 		ip2 = (s64*) sp;
 		*ip2 = *ip1;
-		exec_next();
+		next_cycle();
 	b2r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -905,7 +932,7 @@ execute_process(Process* pro)
 		*rp1 = (r64) (*sp);
 		rp2 = (r64) sp;
 		*rp2 = *rp1;*/ // fix all commented bullshit here.
-		exec_next();
+		next_cycle();
 	u2b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -914,7 +941,7 @@ execute_process(Process* pro)
 		++ip;
 		up1 = (u64*) sp;
 		*sp = (u8) (*up1);
-		exec_next();
+		next_cycle();
 	u2i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -926,7 +953,7 @@ execute_process(Process* pro)
 		*ip1 = (s64) (*up1);
 		ip2 = (s64*) sp;
 		*ip2 = *ip1;
-		exec_next();
+		next_cycle();
 	u2r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -938,7 +965,7 @@ execute_process(Process* pro)
 		*up1 = (u64) (*up1);
 		rp2 = (r64*) sp;
 		*rp2 = *rp1;
-		exec_next();
+		next_cycle();
 	i2b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -947,7 +974,7 @@ execute_process(Process* pro)
 		++ip;
 		ip1 = (s64*) sp;
 		*sp = (u8) (*ip1);
-		exec_next();
+		next_cycle();
 	i2u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -959,7 +986,7 @@ execute_process(Process* pro)
 		*up1 = (u64) (*ip1);
 		up2 = (u64*) sp;
 		*up2 = *up1;
-		exec_next();
+		next_cycle();
 	i2r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -971,7 +998,7 @@ execute_process(Process* pro)
 		*ip1 = (s64) (*up1);
 		rp2 = (r64*) sp;
 		*rp2 = *rp1;
-		exec_next();
+		next_cycle();
 	r2b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -980,7 +1007,7 @@ execute_process(Process* pro)
 		++ip;
 		rp1 = (r64*) sp;
 		*sp = (u8) (*rp1);
-		exec_next();
+		next_cycle();
 	r2u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -992,7 +1019,7 @@ execute_process(Process* pro)
 		*up1 = (u64) (*rp1);
 		up2 = (u64*) sp;
 		*up2 = *up1;
-		exec_next();
+		next_cycle();
 	r2i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1004,7 +1031,7 @@ execute_process(Process* pro)
 		*ip1 = (s64) (*up1);
 		ip2 = (s64*) sp;
 		*ip2 = *ip1;
-		exec_next();
+		next_cycle();
 	lstart:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1020,7 +1047,7 @@ execute_process(Process* pro)
 		lp_cont = img_byte(*up1);
 		lp_stop = img_byte(*up2);
 		ip = lp_cont;
-		exec_next();
+		next_cycle();
 	ltest:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1032,21 +1059,21 @@ execute_process(Process* pro)
 		} else {
 			ip = lp_stop;
 		}
-		exec_next();
+		next_cycle();
 	lcont:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\n\tLCONT executed on cycle %u", (unsigned) cycnum);
 		#endif
 		ip = lp_cont;
-		exec_next();
+		next_cycle();
 	lstop:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\n\tLSTOP executed on cycle %u", (unsigned) cycnum);
 		#endif
 		ip = lp_stop;
-		exec_next();
+		next_cycle();
 	put_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1058,7 +1085,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		*bp1 = *ip;
 		++ip;
-		exec_next();
+		next_cycle();
 	put_nb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1072,7 +1099,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		memcpy(bp1, ip, (*up1));
 		ip += (*up1);
-		exec_next();
+		next_cycle();
 	put_hw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1084,7 +1111,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		memcpy(bp1, ip, hwordsize);
 		ip += hwordsize;
-		exec_next();
+		next_cycle();
 	put_w:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1096,7 +1123,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		memcpy(bp1, ip, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	put_nw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1110,7 +1137,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		memcpy(bp1, ip, (wordsize * (*up1)));
 		ip += (wordsize * (*up1));
-		exec_next();
+		next_cycle();
 	put_dw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1122,7 +1149,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		memcpy(bp1, ip, dwordsize);
 		ip += dwordsize;
-		exec_next();
+		next_cycle();
 	put_qw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1134,7 +1161,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		memcpy(bp1, ip, qwordsize);
 		ip += qwordsize;
-		exec_next();
+		next_cycle();
 	put_s:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1147,7 +1174,7 @@ execute_process(Process* pro)
 		c = strlen(ip) + 1;
 		memcpy(bp1, ip, c);
 		ip += c;
-		exec_next();
+		next_cycle();
 	cpy_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1161,7 +1188,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		ip += wordsize;
 		*bp1 = *bp2;
-		exec_next();
+		next_cycle();
 	cpy_nb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1177,7 +1204,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		ip += wordsize;
 		memcpy(bp1, bp2, (*up1));
-		exec_next();
+		next_cycle();
 	cpy_hw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1191,7 +1218,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		ip += wordsize;
 		memcpy(bp1, bp2, hwordsize);
-		exec_next();
+		next_cycle();
 	cpy_w:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1205,7 +1232,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		ip += wordsize;
 		memcpy(bp1, bp2, wordsize);
-		exec_next();
+		next_cycle();
 	cpy_nw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1221,7 +1248,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		ip += wordsize;
 		memcpy(bp1, ip, (wordsize * (*up1)));
-		exec_next();
+		next_cycle();
 	cpy_dw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1235,7 +1262,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		ip += wordsize;
 		memcpy(bp1, bp2, dwordsize);
-		exec_next();
+		next_cycle();
 	cpy_qw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1249,7 +1276,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		ip += wordsize;
 		memcpy(bp1, bp2, qwordsize);
-		exec_next();
+		next_cycle();
 	cpy_s:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1263,7 +1290,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		ip += wordsize;
 		strcpy(bp1, bp2);
-		exec_next();
+		next_cycle();
 	xch_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1280,7 +1307,7 @@ execute_process(Process* pro)
 		*bp3 = *bp1;
 		*bp1 = *bp2;
 		*bp2 = *bp3;
-		exec_next();
+		next_cycle();
 	xch_nb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1299,7 +1326,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp1, (*up1));
 		memcpy(bp1, bp2, (*up1));
 		memcpy(bp2, bp3, (*up1));
-		exec_next();
+		next_cycle();
 	xch_hw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1316,7 +1343,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp1, hwordsize);
 		memcpy(bp1, bp2, hwordsize);
 		memcpy(bp2, bp3, hwordsize);
-		exec_next();
+		next_cycle();
 	xch_w:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1333,7 +1360,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp1, wordsize);
 		memcpy(bp1, bp2, wordsize);
 		memcpy(bp2, bp3, wordsize);
-		exec_next();
+		next_cycle();
 	xch_nw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1352,7 +1379,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp1, (wordsize * (*up1)));
 		memcpy(bp1, bp2, (wordsize * (*up1)));
 		memcpy(bp2, bp3, (wordsize * (*up1)));
-		exec_next();
+		next_cycle();
 	xch_qw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1369,7 +1396,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp1, qwordsize);
 		memcpy(bp1, bp2, qwordsize);
 		memcpy(bp2, bp3, qwordsize);
-		exec_next();
+		next_cycle();
 	xch_dw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1386,7 +1413,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp1, dwordsize);
 		memcpy(bp1, bp2, dwordsize);
 		memcpy(bp2, bp3, dwordsize);
-		exec_next();
+		next_cycle();
 	xch_s:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1403,7 +1430,7 @@ execute_process(Process* pro)
 		strcpy(bp3, bp1);
 		strcpy(bp1, bp2);
 		strcpy(bp2, bp3);
-		exec_next();
+		next_cycle();
 	rstk_up:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1411,7 +1438,7 @@ execute_process(Process* pro)
 		#endif
 		++ip;
 		++rp;
-		exec_next();		
+		next_cycle();		
 	rstk_dwn:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1419,7 +1446,7 @@ execute_process(Process* pro)
 		#endif
 		++ip;
 		--rp;
-		exec_next();		
+		next_cycle();		
 	rstk_rst:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1427,11 +1454,11 @@ execute_process(Process* pro)
 		#endif
 		++ip;
 		rp = rstk;
-		exec_next();
-	rsv_sys1:
+		next_cycle();
+	openf:
 		#ifdef DEBUG_MODE
 		++cycnum;
-		printf("\nrsv_io1 executed on cycle %u", (unsigned) cycnum);
+		printf("\n\t OPENF executed on cycle %u", (unsigned) cycnum);
 		#endif
 		return;
 	rsv_sys2:
@@ -1512,6 +1539,9 @@ execute_process(Process* pro)
 		printf("\nrsv_io9 executed on cycle %u", (unsigned) cycnum);
 		#endif
 		return;
+	stk_tt_dup:
+		// REDUNDANT INSTRUCTION REMOVAL PERMENENTLY!
+		return;
 	rsv_sys15:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1528,7 +1558,7 @@ execute_process(Process* pro)
 		++ip;
 		*bp1 = *ip;
 		++ip;
-		exec_next();
+		next_cycle();
 	put_w_fs:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1539,7 +1569,7 @@ execute_process(Process* pro)
 		++ip;
 		memcpy(bp1, ip, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	cpy_b_fs:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1552,7 +1582,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		ip += wordsize;
 		*bp1 = *bp2;
-		exec_next();
+		next_cycle();
 	cpy_w_fs:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1565,7 +1595,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		ip += wordsize;
 		memcpy(bp1, bp2, wordsize);
-		exec_next();
+		next_cycle();
 	xch_b_fs:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1581,7 +1611,7 @@ execute_process(Process* pro)
 		*bp3 = *bp2;
 		*bp2 = *bp1;
 		*bp1 = *bp3;
-		exec_next();
+		next_cycle();
 	xch_w_fs:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1597,7 +1627,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp2, wordsize);
 		memcpy(bp2, bp1, wordsize);
 		memcpy(bp1, bp3, wordsize);
-		exec_next();
+		next_cycle();
 	set_tdx_fc:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1607,7 +1637,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		tdx = img_byte(*up1);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	set_tdx_fh:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1618,7 +1648,7 @@ execute_process(Process* pro)
 		up1 = (u64*) img_byte(*up1);
 		ip += wordsize;
 		tdx = img_byte(*up1);
-		exec_next();
+		next_cycle();
 	set_tdx_fs:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1627,7 +1657,7 @@ execute_process(Process* pro)
 		++ip;
 		up1 = (u64*) sp;
 		tdx = img_byte(*up1);
-		exec_next();
+		next_cycle();
 	tdx_b_up:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1635,7 +1665,7 @@ execute_process(Process* pro)
 		#endif
 		++tdx;
 		++ip;
-		exec_next();	
+		next_cycle();	
 	tdx_b_dwn:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1643,7 +1673,7 @@ execute_process(Process* pro)
 		#endif
 		--tdx;
 		++ip;
-		exec_next();	
+		next_cycle();	
 	tdx_w_up:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1651,7 +1681,7 @@ execute_process(Process* pro)
 		#endif
 		tdx += wordsize;
 		++ip;
-		exec_next();
+		next_cycle();
 	tdx_w_dwn:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1659,7 +1689,7 @@ execute_process(Process* pro)
 		#endif
 		tdx -= wordsize;
 		++ip;
-		exec_next();
+		next_cycle();
 	t_fd_putb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1669,7 +1699,7 @@ execute_process(Process* pro)
 		*tdx = *ip;
 		++tdx;
 		++ip;
-		exec_next();
+		next_cycle();
 	t_bk_putb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1679,7 +1709,7 @@ execute_process(Process* pro)
 		*tdx = *ip;
 		--tdx;
 		++ip;
-		exec_next();
+		next_cycle();
 	t_fd_putw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1689,7 +1719,7 @@ execute_process(Process* pro)
 		memcpy(tdx, ip, wordsize);
 		tdx += wordsize;
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	t_bk_putw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1699,7 +1729,7 @@ execute_process(Process* pro)
 		memcpy(tdx, ip, wordsize);
 		tdx -= wordsize;
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	t_fd_cpyb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1711,7 +1741,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		*tdx = *bp1;
 		++tdx;
-		exec_next();
+		next_cycle();
 	t_bk_cpyb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1723,7 +1753,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		*tdx = *bp1;
 		--tdx;
-		exec_next();
+		next_cycle();
 	t_fd_cpyw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1735,7 +1765,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		memcpy(tdx, bp1, wordsize);
 		++tdx;
-		exec_next();
+		next_cycle();
 	t_bk_cpyw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1747,7 +1777,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		memcpy(tdx, bp1, wordsize);
 		++tdx;
-		exec_next();
+		next_cycle();
 	t_fd_popb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1757,7 +1787,7 @@ execute_process(Process* pro)
 		sp -= wordsize;
 		++tdx;
 		++ip;
-		exec_next();
+		next_cycle();
 	t_bk_popb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1767,7 +1797,7 @@ execute_process(Process* pro)
 		sp -= wordsize;
 		--tdx;
 		++ip;
-		exec_next();
+		next_cycle();
 	t_fd_popw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1777,7 +1807,7 @@ execute_process(Process* pro)
 		sp -= wordsize;
 		++tdx;
 		++ip;
-		exec_next();
+		next_cycle();
 	t_bk_popw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1787,7 +1817,7 @@ execute_process(Process* pro)
 		sp -= wordsize;
 		--tdx;
 		++ip;
-		exec_next();
+		next_cycle();
 	t_fd_pshb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1797,7 +1827,7 @@ execute_process(Process* pro)
 		*sp = *tdx;
 		++tdx;
 		++ip;
-		exec_next();
+		next_cycle();
 	t_bk_pshb:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1807,7 +1837,7 @@ execute_process(Process* pro)
 		*sp = *tdx;
 		--tdx;
 		++ip;
-		exec_next();
+		next_cycle();
 	t_fd_pshw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1817,7 +1847,7 @@ execute_process(Process* pro)
 		memcpy(sp, tdx, wordsize);
 		tdx += wordsize;
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	t_bk_pshw:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1827,7 +1857,7 @@ execute_process(Process* pro)
 		memcpy(sp, tdx, wordsize);
 		tdx -= wordsize;
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_spoffs:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1837,7 +1867,7 @@ execute_process(Process* pro)
 		sp += wordsize;
 		up1 = (u64*) sp;
 		*up1 = sp_offset();
-		exec_next();	
+		next_cycle();	
 	stk_save:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1848,7 +1878,7 @@ execute_process(Process* pro)
 		bp1 = img_byte(*up1);
 		memcpy(bp1, stk, STACK_SIZE);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_load:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1859,7 +1889,7 @@ execute_process(Process* pro)
 		bp1 = img_byte(*up1);
 		memcpy(stk, bp1, STACK_SIZE);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_up:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1867,7 +1897,7 @@ execute_process(Process* pro)
 		#endif
 		sp += wordsize;
 		++ip;
-		exec_next();
+		next_cycle();
 	stk_dwn:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1875,7 +1905,7 @@ execute_process(Process* pro)
 		#endif
 		sp -= wordsize;
 		++ip;
-		exec_next();
+		next_cycle();
 	stk_rst:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1883,7 +1913,7 @@ execute_process(Process* pro)
 		#endif
 		sp = stk;
 		++ip;
-		exec_next();
+		next_cycle();
 	stk_clr:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1892,7 +1922,7 @@ execute_process(Process* pro)
 		memset(stk, 0, STACK_SIZE);
 		sp = stk;
 		++ip;
-		exec_next();
+		next_cycle();
 	stk_set:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1906,7 +1936,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		memcpy(bp1, bp2, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_setn:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1922,7 +1952,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		memcpy(bp1, bp2, (*up1));
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_setc:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1934,7 +1964,7 @@ execute_process(Process* pro)
 		ip += wordsize;
 		memcpy(bp1, ip, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_setcn:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1950,7 +1980,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		memcpy(bp1, bp2, (*up1));
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_cpy:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1964,7 +1994,7 @@ execute_process(Process* pro)
 		bp2 = (sp - (*up1));
 		memcpy(bp1, bp2, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_cpyn:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1980,7 +2010,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		memcpy(bp1, bp2, (*up1));
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_xch:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -1997,7 +2027,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp2, wordsize);
 		memcpy(bp2, bp1, wordsize);
 		memcpy(bp1, bp3, wordsize);
-		exec_next();
+		next_cycle();
 	stk_xchn:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2016,7 +2046,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp2, (*up1));
 		memcpy(bp2, bp1, (*up1));
 		memcpy(bp1, bp3, (*up1));
-		exec_next();
+		next_cycle();
 	stk_hxch:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2033,7 +2063,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp2, wordsize);
 		memcpy(bp2, bp1, wordsize);
 		memcpy(bp1, bp3, wordsize);
-		exec_next();
+		next_cycle();
 	stk_hxchn:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2052,7 +2082,7 @@ execute_process(Process* pro)
 		memcpy(bp3, bp2, (*up1));
 		memcpy(bp2, bp1, (*up1));
 		memcpy(bp1, bp3, (*up1));
-		exec_next();
+		next_cycle();
 	stk_mov:
 		return;
 	stk_movn:
@@ -2084,7 +2114,7 @@ execute_process(Process* pro)
 		bp1 = sp;
 		sp += wordsize;
 		memcpy(sp, bp1, wordsize);
-		exec_next();
+		next_cycle();
 	stk_top_dup2:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2096,7 +2126,7 @@ execute_process(Process* pro)
 		memcpy(sp, bp1, wordsize);
 		sp += wordsize;
 		memcpy(sp, bp1, wordsize);
-		exec_next();
+		next_cycle();
 	stk_dup:
 		return;
 	stk_tapsh:
@@ -2108,7 +2138,7 @@ execute_process(Process* pro)
 		up1 = (u64*) sp;
 		bp1 = img_byte(*up1);
 		memcpy(sp, bp1, wordsize);
-		exec_next();
+		next_cycle();
 	stk_psh:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2120,7 +2150,7 @@ execute_process(Process* pro)
 		sp += wordsize;
 		memcpy(sp, bp1, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_pshc:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2130,7 +2160,7 @@ execute_process(Process* pro)
 		sp += wordsize;
 		memcpy(sp, ip, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_psh0:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2140,7 +2170,7 @@ execute_process(Process* pro)
 		sp += wordsize;
 		up1 = (u64*) sp;
 		*up1 = 0;
-		exec_next();
+		next_cycle();
 	stk_psh1:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2150,7 +2180,7 @@ execute_process(Process* pro)
 		sp += wordsize;
 		up1 = (u64*) sp;
 		*up1 = 1;
-		exec_next();
+		next_cycle();
 	stk_psh2:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2160,7 +2190,7 @@ execute_process(Process* pro)
 		sp += wordsize;
 		up1 = (u64*) sp;
 		*up1 = 2;
-		exec_next();
+		next_cycle();
 	stk_ovwr:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2171,7 +2201,7 @@ execute_process(Process* pro)
 		bp1 = img_byte(*up1);
 		memcpy(sp, bp1, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_ovwrc:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2180,7 +2210,7 @@ execute_process(Process* pro)
 		++ip;
 		memcpy(sp, ip, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_ovwr0:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2189,7 +2219,7 @@ execute_process(Process* pro)
 		++ip;
 		up1 = (u64*) sp;
 		*up1 = 0;
-		exec_next();
+		next_cycle();
 	stk_ovwr1:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2198,7 +2228,7 @@ execute_process(Process* pro)
 		++ip;
 		up1 = (u64*) sp;
 		*up1 = 1;
-		exec_next();
+		next_cycle();
 	stk_ovwr2:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2207,7 +2237,7 @@ execute_process(Process* pro)
 		++ip;
 		up1 = (u64*) sp;
 		*up1 = 2;
-		exec_next();
+		next_cycle();
 	stk_stor:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2218,7 +2248,7 @@ execute_process(Process* pro)
 		bp1 = img_byte(*up1);
 		memcpy(bp1, sp, wordsize);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_pop:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2230,7 +2260,7 @@ execute_process(Process* pro)
 		memcpy(bp1, sp, wordsize);
 		sp -= wordsize;
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	stk_xcht:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2243,7 +2273,7 @@ execute_process(Process* pro)
 		memcpy(bp2, bp3, wordsize);
 		memcpy(bp3, bp1, wordsize);
 		++ip;
-		exec_next();
+		next_cycle();
 	stk_gcol:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2254,7 +2284,7 @@ execute_process(Process* pro)
 			;
 		}
 		++ip;
-		exec_next();
+		next_cycle();
 	str_cat:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2268,7 +2298,7 @@ execute_process(Process* pro)
 		bp2 = img_byte(*up1);
 		ip += wordsize;
 		strcat(bp1, bp2);
-		exec_next();
+		next_cycle();
 	str_ncat:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2284,7 +2314,7 @@ execute_process(Process* pro)
 		up1 = (u64*) ip;
 		ip += wordsize;
 		strncat(bp1, bp2, (*up1));
-		exec_next();
+		next_cycle();
 	str_len:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2297,7 +2327,7 @@ execute_process(Process* pro)
 		up1 = (u64*) sp;
 		*up1 = strlen(bp1);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 	str_cmp:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2313,7 +2343,7 @@ execute_process(Process* pro)
 		sp += wordsize;
 		up1 = (u64*) sp;
 		*up1 = strcmp(bp1, bp2);
-		exec_next();
+		next_cycle();
 	str_ncmp:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2331,7 +2361,7 @@ execute_process(Process* pro)
 		sp += wordsize;
 		up1 = (u64*) sp;
 		*up1 = strncmp(bp1, bp2, (*up1));
-		exec_next();
+		next_cycle();
 	str_str:
 		return;
 	str_cspn:
@@ -2341,7 +2371,7 @@ execute_process(Process* pro)
 	jmp_str_cmp:
 		#ifdef DEBUG_MODE
 		++cycnum;
-		printf("\nJMP_STR_CMP executed on cycle %u", (unsigned) cycnum);
+		printf("\n\tJMP_STR_CMP executed on cycle %u", (unsigned) cycnum);
 		#endif
 		++ip;
 		up1 = (u64*) ip;
@@ -2358,7 +2388,7 @@ execute_process(Process* pro)
 		} else {
 			ip += wordsize;
 		}
-		exec_next();
+		next_cycle();
 	jmp_str_ncmp:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2381,7 +2411,7 @@ execute_process(Process* pro)
 		} else {
 			ip += wordsize;
 		}
-		exec_next();
+		next_cycle();
 	show_top_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2389,7 +2419,7 @@ execute_process(Process* pro)
 		#endif
 		printf("\n\t\tstack-top(u8): %u", (unsigned) *sp);
 		++ip;
-		exec_next();
+		next_cycle();
 	show_top_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2398,7 +2428,7 @@ execute_process(Process* pro)
 		up1 = (u64*) sp;
 		printf("\n\t\tstack-top(u64): %u", (unsigned) *up1);
 		++ip;
-		exec_next();
+		next_cycle();
 	show_top_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2407,7 +2437,7 @@ execute_process(Process* pro)
 		ip1 = (s64*) sp;
 		printf("\n\t\tstack-top(s64): %d", (int) *ip1);
 		++ip;
-		exec_next();
+		next_cycle();
 	show_top_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2416,7 +2446,7 @@ execute_process(Process* pro)
 		rp1 = (r64*) sp;
 		printf("\n\t\tstack-top(s64): %f", (double) *rp1);
 		++ip;
-		exec_next();
+		next_cycle();
 	show_mem_b:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2427,7 +2457,7 @@ execute_process(Process* pro)
 		bp1 = img_byte(*up1);
 		ip += wordsize;
 		printf("\n\t\theap[%u] = (u8) %u", (unsigned) *up1, (unsigned) *bp1);
-		exec_next();
+		next_cycle();
 	show_mem_u:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2438,7 +2468,7 @@ execute_process(Process* pro)
 		up2 = (u64*) img_byte(*up1);
 		ip += wordsize;
 		printf("\n\t\theap[%u] = (u64) %u", (unsigned) *up1, (unsigned) *up2);
-		exec_next();
+		next_cycle();
 	show_mem_i:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2449,7 +2479,7 @@ execute_process(Process* pro)
 		ip1 = (s64*) img_byte(*up1);
 		ip += wordsize;
 		printf("\n\t\theap[%u] = (s64) %u", (unsigned) *up1, (int) *ip2);
-		exec_next();
+		next_cycle();
 	show_mem_r:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2460,7 +2490,7 @@ execute_process(Process* pro)
 		rp1 = (r64*) img_byte(*up1);
 		ip += wordsize;
 		printf("\n\t\theap[%u] = (r64) %f", (unsigned) *up1, (double) *rp1);
-		exec_next();
+		next_cycle();
 	show_mem_s:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2471,14 +2501,33 @@ execute_process(Process* pro)
 		bp1 = (char*) img_byte(*up1);
 		printf("\n\t\theap[%u] = (str) \"%s\"", (unsigned) *up1, (char*) bp1);
 		ip += wordsize;
-		exec_next();
+		next_cycle();
 
-	stk_tt_dup:
-		// REDUNDANT INSTRUCTION REMOVAL PERMENENTLY!
-		return;
-
+// Debugger Control.
 	breakpoint:
-		return;
+		#ifdef DEBUG_MODE
+		++cycnum;
+		printf("\n\tBREAKPOINT executed on cycle %u", (unsigned) cycnum);
+		goto die;
+		#else
+		goto nop;
+		#endif
+
+	#ifdef DEBUG_MODE
+	db_start:
+		goto *dbtable[dbmenu_input()];
+
+		dbact_stop:
+			goto db_start;
+		dbact_run:
+			db_mode = RUN;
+			next_cycle();
+		dbact_step:
+			db_mode = STEP;
+			next_cycle();
+		dbact_end:
+			return;
+		#endif
 }
 
 Process*
@@ -2568,10 +2617,12 @@ void ty_exec(Process* pro) {
 	printf("\n\n\ttyson shutdown.\n");
 }
 
+
 int main() {
 	Process* pro = build_process("first.tx");
 	ty_exec(pro);
 	return 0;
 }
+
 
 
