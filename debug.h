@@ -5,20 +5,26 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-#define DBACT_COUNT 4
+#define DBACT_COUNT 7
 
 #define END         0
 #define RUN         1
 #define STEP        2
 #define STOP        3
+#define RESET       4
+#define PRINT_STK   5
+#define PRINT_MEM   6
 
-#define build_dbtable()                  			     \
-	static void* dbtable[DBACT_COUNT]= {&&dbact_end,     \
-		                                &&dbact_run,     \
-		                                &&dbact_step,    \
-		                                &&dbact_stop}
+#define build_dbtable()                  			       \
+	static void* dbtable[DBACT_COUNT]= {&&dbact_end,       \
+		                                &&dbact_run,       \
+		                                &&dbact_step,      \
+		                                &&dbact_stop,      \
+		                                &&dbact_reset,     \
+		                                &&dbact_print_stk, \
+		                                &&dbact_print_mem}
 
-const char* dbmenu_str = "\n\t[0]end [1]run [2]step [3]stop";
+const char* dbmenu_str = "\n\t[0]end [1]run [2]step [3]stop [4]reset [5]print-stk [6]print-mem";
 const char* input_msg  = "\n --> ";
 const char* invalid_input_msg = "\n\tinvalid input, try again.";
 
@@ -57,10 +63,8 @@ u8* get_stdin_str() {
     u8  sz = 0;
     u8* r;
     int ch;
-
     while ((ch=fgetc(stdin)) != 10)
         buf[sz++] = (u8) ch;
-        
     buf[sz] = 0;
     r = (u8*) malloc(sz+1);
     strcpy(r, buf);
@@ -81,7 +85,7 @@ u8 dbmenu_input()
 		    	input = atoi(str);
 		    	free(str);
 			    switch (input) {
-				    case END: case RUN: case STEP: case STOP:
+				    case END: case RUN: case STEP: case STOP: case RESET: case PRINT_STK: case PRINT_MEM:
 					    return (u8) input;
 				    default:
 					    printf("%s", invalid_input_msg);

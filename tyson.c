@@ -20,6 +20,7 @@
 #define sp_offset() \
 	((u64) (sp - stk))
 
+
 // VM compilation mode is specified by the macro below.
 // Set to DEBUG_MODE or REAL_MODE.
 #define DEBUG_MODE
@@ -92,6 +93,9 @@ execute_process(Process* pro)
     u8  db_mode = STEP;
 	u64 cycnum  = 0;
     u8  cycact  = 1;
+    u64 addr;
+    u8* str;
+    u8  *a, *b;
     goto db_start;
 	#else
 	// VM has been initialised and is ready to call the process' main subroutine.
@@ -102,10 +106,6 @@ execute_process(Process* pro)
 	die:
 		#ifdef DEBUG_MODE
 		++cycnum;
-		if (*ip == DIE)
-		    printf("\n\tDIE executed on cycle %u\n", (unsigned) cycnum);
-		ip = pro->start_byte;
-		cycnum = 1;
 		goto db_start;
 		#else
 		return;
@@ -2527,6 +2527,100 @@ execute_process(Process* pro)
 			next_cycle();
 		dbact_end:
 			return;
+	    dbact_reset:
+	        db_mode = STEP;
+	        ip = pro->start_byte;
+		    cycnum = 1;
+		    sp = stk;
+		    goto db_start;
+		dbact_print_stk:
+		    for (;;) {
+		        printf("\n\tprint-stack\n\t\tindex: ");
+		        str = get_stdin_str();
+		        if (is_int(str)) {
+		    	    addr = (u64) atoi(str);
+		    	    free(str);
+		    	    break;
+		    	} else {
+		    	    printf("%s", invalid_input_msg);
+			        continue;	
+		    	}
+		    }
+		    for (;;) {
+		        printf("\n\t[1]u8 [2]u64 [3]s64 [4]r64\n\t\tdatatype: ");
+		        str = get_stdin_str();
+		        if (is_int(str)) {
+		    	    c = (u64) atoi(str);
+		    	    free(str);
+		    	    break;
+		    	} else {
+		    	    printf("%s", invalid_input_msg);
+			        continue;	
+		    	}
+		    }    
+		    switch (c) {
+		        case 1:
+		            bp1 = stack_byte(addr);
+		            printf("\n\t\t\tstack-top(u8): %u", (unsigned) *bp1);
+		            break;
+		        case 2:
+		            up1 = (u64*) stack_byte(addr);
+		            printf("\n\t\tstack-top(u64): %u", (unsigned) *up1);
+		            break;
+		        case 3:
+		        	ip1 = (s64*) stack_byte(addr);
+		            printf("\n\t\tstack-top(s64): %d", (int) *ip1);
+		            break;
+		        case 4:
+		        	rp1 = (r64*) stack_byte(addr);
+		            printf("\n\t\tstack-top(r64): %f", (double) *rp1);
+		            break;
+		    }
+		    goto db_start;
+		dbact_print_mem:
+		    for (;;) {
+		        printf("\n\tprint-mem\n\t\tindex: ");
+		        str = get_stdin_str();
+		        if (is_int(str)) {
+		    	    addr = (u64) atoi(str);
+		    	    free(str);
+		    	    break;
+		    	} else {
+		    	    printf("%s", invalid_input_msg);
+			        continue;	
+		    	}
+		    }
+		    for (;;) {
+		        printf("\n\t[1]u8 [2]u64 [3]s64 [4]r64\n\t\tdatatype: ");
+		        str = get_stdin_str();
+		        if (is_int(str)) {
+		    	    c = (u64) atoi(str);
+		    	    free(str);
+		    	    break;
+		    	} else {
+		    	    printf("%s", invalid_input_msg);
+			        continue;	
+		    	}
+		    }    
+		    switch (c) {
+		        case 1:
+		            bp1 = img_byte(addr);
+		            printf("\n\t\theap[%u] = (u8) %u", (unsigned) addr, (unsigned) *bp1);
+		            break;
+		        case 2:
+		            up1 = (u64*) img_byte(addr);
+		            printf("\n\t\theap[%u] = (u64) %u", (unsigned) addr, (unsigned) *up1);
+		            break;
+		        case 3:
+		        	ip1 = (s64*) img_byte(addr);
+		            printf("\n\t\theap[%u] = (s64) %d", (unsigned) addr, (int) *ip1);
+		            break;
+		        case 4:
+		        	rp1 = (r64*) img_byte(addr);
+		            printf("\n\t\theap[%u] = (r64) %f",  (unsigned) addr, (double) *rp1);
+		            break;
+		    }
+		    goto db_start;
 		#endif
 }
 
