@@ -46,10 +46,12 @@
 #endif
 
 
-void
+int
 execute_process(Process* pro)
 {
 	build_optable();
+	
+	int retval = 0;
 
 	// Initialise work stack.
 	u8  stk[STACK_SIZE]; // array.
@@ -108,7 +110,7 @@ execute_process(Process* pro)
 		++cycnum;
 		goto db_start;
 		#else
-		return;
+		return retval;
 		#endif
 	nop:
 		#ifdef DEBUG_MODE
@@ -1460,94 +1462,94 @@ execute_process(Process* pro)
 		++cycnum;
 		printf("\n\t OPENF executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys2:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io2 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys3:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io3 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys4:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io4 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys5:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io5 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys6:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io6 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys7:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io7 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys8:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io8 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys9:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io9 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys10:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io10 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys11:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io6 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys12:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io7 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys13:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io8 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	rsv_sys14:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io9 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	stk_tt_dup:
 		// REDUNDANT INSTRUCTION REMOVAL PERMENENTLY!
-		return;
+		return retval;
 	rsv_sys15:
 		#ifdef DEBUG_MODE
 		++cycnum;
 		printf("\nrsv_io10 executed on cycle %u", (unsigned) cycnum);
 		#endif
-		return;
+		return retval;
 	put_b_fs:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2084,27 +2086,27 @@ execute_process(Process* pro)
 		memcpy(bp1, bp3, (*up1));
 		next_cycle();
 	stk_mov:
-		return;
+		return retval;
 	stk_movn:
-		return;
+		return retval;
 	stk_del:
-		return;
+		return retval;
 	stk_deln:
-		return;
+		return retval;
 	stk_get:
-		return;
+		return retval;
 	stk_getn:
-		return;
+		return retval;
 	stk_ins:
-		return;
+		return retval;
 	stk_insn:
-		return;
+		return retval;
 	stk_2top:
-		return;
+		return retval;
 	stk_xt_dup:
-		return;
+		return retval;
 	stk_tx_dup:
-		return;
+		return retval;
 	stk_top_dup:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2128,7 +2130,7 @@ execute_process(Process* pro)
 		memcpy(sp, bp1, wordsize);
 		next_cycle();
 	stk_dup:
-		return;
+		return retval;
 	stk_tapsh:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2363,11 +2365,11 @@ execute_process(Process* pro)
 		*up1 = strncmp(bp1, bp2, (*up1));
 		next_cycle();
 	str_str:
-		return;
+		return retval;
 	str_cspn:
-		return;
+		return retval;
 	str_chr:
-		return;
+		return retval;
 	jmp_str_cmp:
 		#ifdef DEBUG_MODE
 		++cycnum;
@@ -2526,7 +2528,7 @@ execute_process(Process* pro)
 			db_mode = STEP;
 			next_cycle();
 		dbact_end:
-			return;
+			return retval;
 	    dbact_reset:
 	        db_mode = STEP;
 	        ip = pro->start_byte;
@@ -2650,18 +2652,13 @@ free_process(Process* pro)
 	free(pro);
 }
 
-// Takes path to .tpx file.
-// Process object will be created then returned.
 
-/*
-	Build Process:
-		
-*/
 Process*
-build_process(const char* path)
+build_process(const char* path, ProcessArgs* pargs)
 {
-	// Pointer used for setting up process object's start_byte pointer.
-	u64* up;
+	// Pointers used for writing metadata values.
+	u64 *up0, *up1, *up2, *up3, *up4;
+	u8* bp;
 
 	// Allocate our to-be returned process object.
 	Process* pro = malloc_process();
@@ -2673,12 +2670,12 @@ build_process(const char* path)
 	// Attempt to open file.
 	FILE* tpx_file = fopen(path, "rb");
 
-	// Read 8 bytes from start of file into the size block then set file-pointer back to start.
+	// Read 8 bytes from start of file into the size block then set file-ptr back to start.
 	fread(size, 1, 8, tpx_file);
 	rewind(tpx_file);
 
-	// Now we know the exact size of the file in question we can allocate an array accurately.
-	// This array will go directly into the process object then we'll read the entire file into it.
+	// Now we know the exact size of the file in question we can alloc an array accurately.
+	// This array will go directly into the process obj then we read whole file into it.
 	mc = malloc(*size);
 	pro->img = (u8*) mc;
 
@@ -2686,12 +2683,39 @@ build_process(const char* path)
 	fread(pro->img, 1, *size, tpx_file);
 	fclose(tpx_file);
 
-	// Set up process object's vars.
-	up = (u64*) ((pro->img) + wordsize); // pointer to address containing u64 value that is start address.
-	pro->start_byte = ((u8*) (((pro->img) + (*up)))); // set start_byte pointer.
+	// Write in the remaining process object vars.
+	// Firstly getting start-byte address from metadata then
+	// using this to set the start_byte process object pointer.
+	up0 = (u64*) ((pro->img) + START_ADDR_OFFS); 
+	pro->start_byte = ((u8*) (((pro->img) + (*up0))));
 	pro->size = *size;
-
+	
+	// Now the remaining metadata constants are written in.
+	// These are calculated from the constants below, hence the ptrs.
+	up1 = (u64*) ((pro->img) + TEXT_SIZE_OFFS);
+	up2 = (u64*) ((pro->img) + POOL_SIZE_OFFS);
+	up3 = (u64*) ((pro->img) + HEAP_SIZE_OFFS);
+	up4 = (u64*) ((pro->img) + ARGS_SIZE_OFFS);
+	
+	// Use the above ptrs and this func's args to write in remains.
+	up0 = (u64*) ((pro->img) + POOL_BASE_OFFS);
+	*up0 = METADATA_SIZE + (*up1) + (*up4);
+	up0 = (u64*) ((pro->img) + HEAP_BASE_OFFS);
+	*up0 = METADATA_SIZE + (*up1) + (*up4) + (*up2);
+	up0 = (u64*) ((pro->img) + PIMG_SIZE_OFFS);
+	*up0 = METADATA_SIZE + (*up1) + (*up4) + (*up2) + (*up3);
+	up0 = (u64*) ((pro->img) + ARGS_COUNT_OFFS);
+	*up0 = pargs->argc;
+	up0 = (u64*) ((pro->img) + ARGS_SIZE_OFFS);
+	*up0 = pargs->argsz;
+				
+	// Copy in args bytes.
+	up0 = (u64*) ((pro->img) + ARGS_BASE_OFFS);
+	bp = ((pro->img) + (*up0));
+	memcpy(bp, pargs->buf, pargs->argsz);
+	
 	// Process object is now ready.
+	free(pargs);
 	return pro;
 }
 
@@ -2705,18 +2729,34 @@ write_process(Process* pro, const char* path)
 }
 
 
-void ty_exec(Process* pro) {
-	printf("\ttyson startup.\n");
-	execute_process(pro);
-	printf("\n\n\ttyson shutdown.\n");
+int ty_main(int argc, char *argv[])
+{
+	ProcessArgs* pargs = (ProcessArgs*) malloc(sizeof(ProcessArgs));
+	pargs->buf = (u8*) malloc(ARGS_BUFFER_SIZE);
+	pargs->argc = argc - 1;
+	pargs->argsz = 0;
+	u8* bp = pargs->buf;
+	Process* pro;
+	u64 i;
+
+	// writes in each arg adjusting arg_size as it goes.
+	for (i=1; i < argc; ++i) {
+		(pargs->argsz) += (strlen(argv[i]) + 1);
+		strcpy(bp, argv[i]);
+		bp += (strlen(argv[i]) + 1);
+	}
+	
+	// Realloc args image so it fits snug.
+	pargs->buf = (u8*) realloc(pargs->buf, pargs->argsz);
+	
+	// pass all the arg info gained above to build_process to make the process image.
+	pro = build_process(argv[1], pargs);
+	
+	// ready for execution.
+	return execute_process(pro);
 }
 
-
-int main() {
-	Process* pro = build_process("first.tx");
-	ty_exec(pro);
-	return 0;
+int main(int argc, char *argv[]) {
+	return ty_main(argc, argv);
 }
-
-
 

@@ -35,15 +35,28 @@
 
 
 // Important Constants.
-#define METADATA_SEG_SIZE (120)
+#define METADATA_SIZE     (96)
 #define START_MARKER      ("main") 
 #define STACK_SIZE        (120000)
 #define RECUR_LIMIT       (200)
 #define TEXT_MAXSIZE      (500000)
 #define DATABUF_SIZE      (STACK_SIZE)
 #define GCOL_THRESHOLD    (2400)
-#define TEXT_BASE         (74)
+#define TEXT_BASE         (METADATA_SIZE)
+#define ARGS_BUFFER_SIZE  (5000)
 
+#define TIMG_SIZE_OFFS	  (0)
+#define START_ADDR_OFFS   (8)
+#define ARGS_BASE_OFFS    (16)
+#define TEXT_BASE_OFFS	  (24)
+#define POOL_BASE_OFFS    (32)
+#define HEAP_BASE_OFFS    (40)
+#define PIMG_SIZE_OFFS	  (48)
+#define TEXT_SIZE_OFFS    (56)
+#define POOL_SIZE_OFFS    (64)
+#define HEAP_SIZE_OFFS    (72)
+#define ARGS_COUNT_OFFS   (80)
+#define ARGS_SIZE_OFFS    (88)
 
 // Native Datatype Declarations.
 /*
@@ -93,6 +106,12 @@ typedef struct {
 	u8* img;
 } Process;
 
+typedef struct {
+	u64 argc;
+	u64 argsz;
+	u8* buf;
+} ProcessArgs;
+
 #define hwordsize  4
 #define wordsize   8
 #define dwordsize 16
@@ -119,79 +138,10 @@ typedef struct {
 #define TRUE  1
 #define FALSE 0
 
-#define copyhword(d, s) \
-	*d = *s;            \
-	*(d+1) = *(s+1);    \
-	*(d+2) = *(s+2);    \
-	*(d+3) = *(s+3)
-
-#define copyword(d, s) \
-	*d = *s;           \
-	*(d+1) = *(s+1);   \
-	*(d+2) = *(s+2);   \
-	*(d+3) = *(s+3);   \
-	*(d+4) = *(s+4);   \
-	*(d+5) = *(s+5);   \
-	*(d+6) = *(s+6);   \
-	*(d+7) = *(s+7)
-
-#define copydword(d, s) \
-	*d      = *s;       \
-	*(d+1)  = *(s+1);   \
-	*(d+2)  = *(s+2);   \
-	*(d+3)  = *(s+3);   \
-	*(d+4)  = *(s+4);   \
-	*(d+5)  = *(s+5);   \
-	*(d+6)  = *(s+6);   \
-	*(d+7)  = *(s+7);   \
-	*(d+8)  = *(s+8);   \
-	*(d+9)  = *(s+9);   \
-	*(d+10) = *(s+10);  \
-	*(d+11) = *(s+11);  \
-	*(d+12) = *(s+12);  \
-	*(d+13) = *(s+13);  \
-	*(d+14) = *(s+14);  \
-	*(d+15) = *(s+15)
-
-#define copyqword(d, s)  \
-	*d       = *s;       \
-	*(d+1)   = *(s+1);   \
-	*(d+2)   = *(s+2);   \
-	*(d+3)   = *(s+3);   \
-	*(d+4)   = *(s+4);   \
-	*(d+5)   = *(s+5);   \
-	*(d+6)   = *(s+6);   \
-	*(d+7)   = *(s+7);   \
-	*(d+8)   = *(s+8);   \
-	*(d+9)   = *(s+9);   \
-	*(d+10)  = *(s+10);  \
-	*(d+11)  = *(s+11);  \
-	*(d+12)  = *(s+12);  \
-	*(d+13)  = *(s+13);  \
-	*(d+14)  = *(s+14);  \
-	*(d+15)  = *(s+15);  \
-	*(d+16)  = *(s+16);  \
-	*(d+17)  = *(s+17);  \
-	*(d+18)  = *(s+18);  \
-	*(d+19)  = *(s+19);  \
-	*(d+20)  = *(s+20);  \
-	*(d+21)  = *(s+21);  \
-	*(d+22)  = *(s+22);  \
-	*(d+23)  = *(s+23);  \
-	*(d+24)  = *(s+24);  \
-	*(d+25)  = *(s+25);  \
-	*(d+26)  = *(s+26);  \
-	*(d+27)  = *(s+27);  \
-	*(d+28)  = *(s+28);  \
-	*(d+29)  = *(s+29);  \
-	*(d+30)  = *(s+30);  \
-	*(d+31)  = *(s+31)
-
-
-void     execute_process(Process*);
+int      execute_process(Process*);
 Process* malloc_process();
 void     free_process(Process*);
-Process* build_process(const char*);
+Process* build_process(const char*, ProcessArgs*);
 u64      write_process(Process*, const char*);
 
 #endif
